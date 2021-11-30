@@ -1,0 +1,1 @@
+CREATE TYPE market AS ENUM ('SPOT', 'USDM', 'COINM');

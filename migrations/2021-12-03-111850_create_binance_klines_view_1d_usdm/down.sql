@@ -1,0 +1,1 @@
+DROP VIEW binance_klines_view_1d_usdm;
