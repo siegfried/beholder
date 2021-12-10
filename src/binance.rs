@@ -24,7 +24,7 @@ use std::{
 #[postgres(type_name = "market")]
 pub struct Market;
 
-#[derive(Debug, PartialEq, AsExpression, Clone, Copy)]
+#[derive(Debug, PartialEq, AsExpression, Clone, Copy, clap::ArgEnum)]
 #[sql_type = "Market"]
 pub enum MarketEndpoint {
     Spot,

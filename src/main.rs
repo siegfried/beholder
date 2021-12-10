@@ -7,147 +7,132 @@ mod result;
 mod schema;
 
 use crate::binance::{KlineQuery, MarketEndpoint};
-use clap::{
-    crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgMatches,
-};
+use clap::{AppSettings, Parser, Subcommand};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use log::warn;
 use result::Error;
 
 fn main() {
-    let matches = App::new(crate_name!())
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about(crate_description!())
-        .setting(AppSettings::SubcommandRequiredElseHelp)
-        .arg(
-            Arg::new("quiet")
-                .short('q')
-                .long("quiet")
-                .about("Silence all output"),
-        )
-        .arg(
-            Arg::new("verbosity")
-                .short('v')
-                .multiple_occurrences(true)
-                .about("Increase message verbosity"),
-        )
-        .arg(
-            Arg::new("timestamp")
-                .short('t')
-                .about("Prepend log lines with a timestamp")
-                .takes_value(true)
-                .possible_values(&["none", "sec", "ms", "ns"]),
-        )
-        .subcommand(
-            App::new("snapshot")
-                .about("Snapshot data to database")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
-                .arg(
-                    Arg::new("database-url")
-                        .short('d')
-                        .long("database-url")
-                        .value_name("URL")
-                        .about("The database to store.")
-                        .takes_value(true)
-                        .required(true),
-                )
-                .subcommand(
-                    App::new("binance")
-                        .about("Binance Source")
-                        .setting(AppSettings::SubcommandRequiredElseHelp)
-                        .subcommand(
-                            App::new("kline")
-                                .about("Kline Data")
-                                .setting(AppSettings::ArgRequiredElseHelp)
-                                .arg(
-                                    Arg::new("market")
-                                        .long("market")
-                                        .value_name("MARKET")
-                                        .about("Choose a market")
-                                        .takes_value(true)
-                                        .possible_values(&["spot", "usdm"])
-                                        .required(true),
-                                )
-                                .arg(
-                                    Arg::new("csv")
-                                        .long("csv")
-                                        .value_name("FILE")
-                                        .about("The CSV file containing tasks of sync")
-                                        .takes_value(true)
-                                        .required(true),
-                                )
-                                .arg(
-                                    Arg::new("limit")
-                                        .long("limit")
-                                        .value_name("NUMBER")
-                                        .about("Use the limit instead of limits in CSV")
-                                        .takes_value(true),
-                                ),
-                        ),
-                ),
-        )
-        .get_matches();
+    let cli = Cli::parse();
+    cli.run();
+}
 
-    let verbose = matches.occurrences_of("verbosity") as usize;
-    let quiet = matches.is_present("quiet");
-    let ts: stderrlog::Timestamp = matches
-        .value_of("timestamp")
-        .map(|v| v.parse().unwrap())
-        .unwrap_or(stderrlog::Timestamp::Off);
+#[derive(Parser)]
+#[clap(author, version, about)]
+#[clap(global_setting(AppSettings::PropagateVersion))]
+#[clap(global_setting(AppSettings::UseLongFormatForHelpSubcommand))]
+#[clap(setting(AppSettings::SubcommandRequiredElseHelp))]
+struct Cli {
+    /// Silence all output
+    #[clap(short, long)]
+    quiet: bool,
 
-    stderrlog::new()
-        .module(module_path!())
-        .quiet(quiet)
-        .verbosity(verbose)
-        .timestamp(ts)
-        .init()
-        .unwrap();
+    /// Increase message verbosity
+    #[clap(short, long, parse(from_occurrences))]
+    verbose: usize,
 
-    match matches.subcommand() {
-        Some(("snapshot", matches)) => {
-            let connection = {
-                let database_url = matches.value_of("database-url").unwrap();
-                PgConnection::establish(&database_url)
-                    .expect(&format!("Error connecting to {}", database_url))
-            };
-            run_snapshot(&connection, matches)
+    /// Timestamp (sec, ms, ns, none)
+    #[clap(short, long)]
+    timestamp: Option<stderrlog::Timestamp>,
+
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+impl Cli {
+    fn run(self) {
+        stderrlog::new()
+            .module(module_path!())
+            .quiet(self.quiet)
+            .verbosity(self.verbose)
+            .timestamp(self.timestamp.unwrap_or(stderrlog::Timestamp::Off))
+            .init()
+            .unwrap();
+
+        self.command.run();
+    }
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Snapshot data to database
+    Snapshot {
+        /// The database to store
+        #[clap(short, long)]
+        database_url: String,
+
+        /// Snapshot data to database
+        #[clap(subcommand)]
+        command: SnapshotCommands,
+    },
+}
+
+impl Commands {
+    fn run(self) {
+        match self {
+            Self::Snapshot {
+                database_url,
+                command,
+            } => {
+                let connection = PgConnection::establish(&database_url).unwrap();
+                command.run(&connection);
+            }
         }
-        _ => unreachable!(),
     }
 }
 
-fn run_snapshot(connection: &PgConnection, matches: &ArgMatches) {
-    match matches.subcommand() {
-        Some(("binance", matches)) => run_snapshot_binance(connection, matches),
-        _ => unreachable!(),
+#[derive(Subcommand)]
+enum SnapshotCommands {
+    Binance {
+        /// Binance Source
+        #[clap(subcommand)]
+        command: BinanceCommands,
+    },
+}
+
+impl SnapshotCommands {
+    fn run(self, connection: &PgConnection) {
+        match self {
+            Self::Binance { command } => command.run(connection),
+        }
     }
 }
 
-fn run_snapshot_binance(connection: &PgConnection, matches: &ArgMatches) {
-    match matches.subcommand() {
-        Some(("kline", matches)) => {
-            let queries = {
-                let path = matches.value_of("csv").unwrap();
-                KlineQuery::from_csv(path).unwrap()
-            };
-            let market: MarketEndpoint = matches.value_of_t_or_exit("market");
-            let limit: Option<u16> = matches
-                .value_of("limit")
-                .map(|limit| limit.parse().unwrap());
+#[derive(Subcommand)]
+enum BinanceCommands {
+    Kline {
+        /// Choose a market
+        #[clap(short, long, arg_enum)]
+        market: MarketEndpoint,
 
-            for query in queries {
-                match market.fetch(&query, limit, &connection) {
-                    Ok(()) => (),
-                    Err(Error::BinanceClient(error)) => {
-                        warn!("Binance client failed: {}", error);
-                        continue;
+        /// The CSV file containing tasks of sync
+        #[clap(short, long)]
+        csv: String,
+
+        /// Use the limit instead of limits in CSV
+        #[clap(short, long)]
+        limit: Option<u16>,
+    },
+}
+
+impl BinanceCommands {
+    fn run(self, connection: &PgConnection) {
+        match self {
+            Self::Kline { market, csv, limit } => {
+                let queries = KlineQuery::from_csv(csv).unwrap();
+
+                for query in queries {
+                    match market.fetch(&query, limit, &connection) {
+                        Ok(()) => (),
+                        Err(Error::BinanceClient(error)) => {
+                            warn!("Binance client failed: {}", error);
+                            continue;
+                        }
+                        error => error.unwrap(),
                     }
-                    error => error.unwrap(),
                 }
             }
         }
-        _ => unreachable!(),
     }
 }
