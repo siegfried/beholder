@@ -41,8 +41,7 @@ dependencies = [
 [[package]]
 name = "binance"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5140d78dbe10ebbf5679d2dc1e8fb07282e14b9cd6c76969679aadf7fe70fecb"
+source = "git+https://github.com/wisespace-io/binance-rs.git#9ad45cfa7ca45c1902a300f0207179c05792f041"
 dependencies = [
  "error-chain",
  "hex",

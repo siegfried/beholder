@@ -4,7 +4,7 @@ use binance_client::{
     api::Binance,
     futures::market::FuturesMarket as FutureEndpoint,
     market::Market as SpotEndpoint,
-    model::{KlineSummaries, KlineSummary},
+    model::{KlineEvent, KlineSummaries, KlineSummary},
 };
 use diesel::pg::{upsert::on_constraint, Pg, PgConnection};
 use diesel::prelude::*;
@@ -120,6 +120,26 @@ impl Kline {
         }
     }
 
+    pub fn from_kline_event(source: MarketEndpoint, event: KlineEvent) -> Self {
+        let kline = event.kline;
+
+        Self {
+            source: source,
+            symbol: kline.symbol,
+            open_time: kline.open_time,
+            close_time: kline.close_time,
+            open: kline.open,
+            high: kline.high,
+            low: kline.low,
+            close: kline.close,
+            base_volume: kline.volume,
+            quote_volume: kline.quote_asset_volume,
+            buy_base_volume: kline.taker_buy_base_asset_volume,
+            buy_quote_volume: kline.taker_buy_quote_asset_volume,
+            number_of_trades: kline.number_of_trades,
+        }
+    }
+
     pub fn upsert(&self, connection: &PgConnection) -> QueryResult<usize> {
         diesel::insert_into(binance_klines::table)
             .values(self)
@@ -151,7 +171,7 @@ impl KlineQuery {
 #[cfg(test)]
 mod tests {
     use super::{Kline, KlineQuery, MarketEndpoint};
-    use binance_client::model::KlineSummary;
+    use binance_client::model::{self, KlineEvent, KlineSummary};
 
     #[test]
     fn create_new_spot_kline_from_summary() {
@@ -171,7 +191,7 @@ mod tests {
 
         let raw_kline = Kline {
             source: MarketEndpoint::Spot,
-            symbol: "symbol".into(),
+            symbol: "ETHBTC".into(),
             open_time: 111,
             close_time: 222,
             open: "open".into(),
@@ -186,7 +206,56 @@ mod tests {
         };
 
         assert_eq!(
-            Kline::from_kline_summary("symbol".into(), MarketEndpoint::Spot, summary),
+            Kline::from_kline_summary("ETHBTC".into(), MarketEndpoint::Spot, summary),
+            raw_kline
+        )
+    }
+
+    #[test]
+    fn create_new_spot_kline_from_kline_event() {
+        let event = KlineEvent {
+            symbol: "ETHBTC".into(),
+            event_time: 111,
+            event_type: "kline".into(),
+            kline: model::Kline {
+                first_trade_id: 1,
+                last_trade_id: 2,
+                interval: "1d".into(),
+                symbol: "ETHBTC".into(),
+                ignore_me: "ignore".into(),
+                is_final_bar: true,
+                open_time: 111,
+                close_time: 222,
+                open: "open".into(),
+                high: "high".into(),
+                low: "low".into(),
+                close: "close".into(),
+                volume: "base volume".into(),
+                quote_asset_volume: "quote volume".into(),
+                taker_buy_base_asset_volume: "buy base volume".into(),
+                taker_buy_quote_asset_volume: "buy quote volume".into(),
+                number_of_trades: 333,
+            },
+        };
+
+        let raw_kline = Kline {
+            source: MarketEndpoint::Spot,
+            symbol: "ETHBTC".into(),
+            open_time: 111,
+            close_time: 222,
+            open: "open".into(),
+            high: "high".into(),
+            low: "low".into(),
+            close: "close".into(),
+            base_volume: "base volume".into(),
+            quote_volume: "quote volume".into(),
+            buy_base_volume: "buy base volume".into(),
+            buy_quote_volume: "buy quote volume".into(),
+            number_of_trades: 333,
+        };
+
+        assert_eq!(
+            Kline::from_kline_event(MarketEndpoint::Spot, event),
             raw_kline
         )
     }
