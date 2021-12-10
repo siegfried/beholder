@@ -7,9 +7,13 @@ mod result;
 mod schema;
 
 use crate::binance::{KlineQuery, MarketEndpoint};
-use clap::{crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg};
+use clap::{
+    crate_authors, crate_description, crate_name, crate_version, App, AppSettings, Arg, ArgMatches,
+};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use log::warn;
+use result::Error;
 
 fn main() {
     let matches = App::new(crate_name!())
@@ -86,7 +90,7 @@ fn main() {
         )
         .get_matches();
 
-    let verbose: usize = matches.occurrences_of("verbosity").try_into().unwrap();
+    let verbose = matches.occurrences_of("verbosity") as usize;
     let quiet = matches.is_present("quiet");
     let ts: stderrlog::Timestamp = matches
         .value_of("timestamp")
@@ -101,39 +105,49 @@ fn main() {
         .init()
         .unwrap();
 
-    if let Some(ref matches) = matches.subcommand_matches("snapshot") {
-        let connection = {
-            let database_url = matches.value_of("database-url").unwrap();
-            PgConnection::establish(&database_url)
-                .expect(&format!("Error connecting to {}", database_url))
-        };
-
-        if let Some(ref binance_matches) = matches.subcommand_matches("binance") {
-            if let Some(ref kline_matches) = binance_matches.subcommand_matches("kline") {
-                let queries = {
-                    let path = kline_matches.value_of("csv").unwrap();
-                    KlineQuery::from_csv(path).unwrap()
-                };
-                run_snapshot_binance_kline(
-                    kline_matches.value_of_t_or_exit("market"),
-                    &queries,
-                    kline_matches
-                        .value_of("limit")
-                        .map(|limit| limit.parse().unwrap()),
-                    &connection,
-                );
-            }
+    match matches.subcommand() {
+        Some(("snapshot", matches)) => {
+            let connection = {
+                let database_url = matches.value_of("database-url").unwrap();
+                PgConnection::establish(&database_url)
+                    .expect(&format!("Error connecting to {}", database_url))
+            };
+            run_snapshot(&connection, matches)
         }
+        _ => unreachable!(),
     }
 }
 
-fn run_snapshot_binance_kline(
-    market: MarketEndpoint,
-    queries: &[KlineQuery],
-    limit: Option<u16>,
-    connection: &PgConnection,
-) {
-    for query in queries {
-        market.fetch(&query, limit, &connection).unwrap();
+fn run_snapshot(connection: &PgConnection, matches: &ArgMatches) {
+    match matches.subcommand() {
+        Some(("binance", matches)) => run_snapshot_binance(connection, matches),
+        _ => unreachable!(),
+    }
+}
+
+fn run_snapshot_binance(connection: &PgConnection, matches: &ArgMatches) {
+    match matches.subcommand() {
+        Some(("kline", matches)) => {
+            let queries = {
+                let path = matches.value_of("csv").unwrap();
+                KlineQuery::from_csv(path).unwrap()
+            };
+            let market: MarketEndpoint = matches.value_of_t_or_exit("market");
+            let limit: Option<u16> = matches
+                .value_of("limit")
+                .map(|limit| limit.parse().unwrap());
+
+            for query in queries {
+                match market.fetch(&query, limit, &connection) {
+                    Ok(()) => (),
+                    Err(Error::BinanceClient(error)) => {
+                        warn!("Binance client failed: {}", error);
+                        continue;
+                    }
+                    error => error.unwrap(),
+                }
+            }
+        }
+        _ => unreachable!(),
     }
 }
