@@ -2,16 +2,24 @@ use crate::result::{Error, Result};
 use crate::schema::binance_klines;
 use binance_client::{
     api::Binance,
-    futures::market::FuturesMarket as FutureEndpoint,
+    futures::{
+        market::FuturesMarket as FutureEndpoint,
+        websockets::{
+            FuturesMarket, FuturesWebSockets as FutureWebSocket,
+            FuturesWebsocketEvent as FutureWebSocketEvent,
+        },
+    },
     market::Market as SpotEndpoint,
     model::{KlineEvent, KlineSummaries, KlineSummary},
+    websockets::{WebSockets as SpotWebSocket, WebsocketEvent as SpotWebSocketEvent},
 };
 use diesel::pg::{upsert::on_constraint, Pg, PgConnection};
 use diesel::prelude::*;
 use diesel::serialize::{self, IsNull, Output, ToSql};
 use diesel::Insertable;
-use log::info;
+use log::{info, warn};
 use serde::Deserialize;
+use std::sync::atomic::AtomicBool;
 use std::{
     fs::OpenOptions,
     io::{BufReader, Write},
@@ -68,6 +76,61 @@ impl MarketEndpoint {
                 .upsert(connection)?;
         }
         Ok(())
+    }
+
+    pub fn watch(&self, queries: &[KlineQuery], connection: &PgConnection) {
+        let topics: Vec<String> = queries
+            .into_iter()
+            .map(|query| format!("{}@kline_{}", query.symbol.to_lowercase(), query.interval))
+            .collect();
+        info!("Listen on topics: {:?}", topics);
+        let keep_running = AtomicBool::new(true);
+
+        match self {
+            Self::Spot => {
+                let mut web_socket: SpotWebSocket =
+                    SpotWebSocket::new(|event: SpotWebSocketEvent| {
+                        if let SpotWebSocketEvent::Kline(kline_event) = event {
+                            if kline_event.kline.is_final_bar {
+                                let kline: Kline = Kline::from_kline_event(*self, kline_event);
+                                info!("Complete Kline received: {:?}", kline);
+                                kline.upsert(connection).unwrap();
+                            } else {
+                                info!("Incomplete Kline received: {:?}", kline_event);
+                            }
+                        } else {
+                            warn!("Unexpected Spot WS Event: {:?}", event);
+                        };
+                        Ok(())
+                    });
+                web_socket.connect_multiple_streams(&topics).unwrap();
+                web_socket.event_loop(&keep_running).unwrap();
+                web_socket.disconnect().unwrap();
+            }
+
+            Self::USDM => {
+                let mut web_socket: FutureWebSocket =
+                    FutureWebSocket::new(|event: FutureWebSocketEvent| {
+                        if let FutureWebSocketEvent::Kline(kline_event) = event {
+                            if kline_event.kline.is_final_bar {
+                                let kline: Kline = Kline::from_kline_event(*self, kline_event);
+                                info!("Complete Kline received: {:?}", kline);
+                                kline.upsert(connection).unwrap();
+                            } else {
+                                info!("Incomplete Kline received: {:?}", kline_event);
+                            }
+                        } else {
+                            warn!("Unexpected USDM WS Event: {:?}", event);
+                        };
+                        Ok(())
+                    });
+                web_socket
+                    .connect_multiple_streams(FuturesMarket::USDM, &topics)
+                    .unwrap();
+                web_socket.event_loop(&keep_running).unwrap();
+                web_socket.disconnect().unwrap();
+            }
+        }
     }
 }
 

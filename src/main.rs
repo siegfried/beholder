@@ -101,6 +101,7 @@ impl SnapshotCommands {
 
 #[derive(Subcommand)]
 enum BinanceCommands {
+    /// Fetch history Klines
     Kline {
         /// Choose a market
         #[clap(short, long, arg_enum)]
@@ -114,6 +115,17 @@ enum BinanceCommands {
         #[clap(short, long)]
         limit: Option<u16>,
     },
+
+    /// Watch Klines in real time
+    KlineStream {
+        /// Choose a market
+        #[clap(short, long, arg_enum)]
+        market: MarketEndpoint,
+
+        /// The CSV file containing tasks of sync
+        #[clap(short, long)]
+        csv: String,
+    },
 }
 
 impl BinanceCommands {
@@ -123,7 +135,7 @@ impl BinanceCommands {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
                 for query in queries {
-                    match market.fetch(&query, limit, &connection) {
+                    match market.fetch(&query, limit, connection) {
                         Ok(()) => (),
                         Err(Error::BinanceClient(error)) => {
                             warn!("Binance client failed: {}", error);
@@ -132,6 +144,12 @@ impl BinanceCommands {
                         error => error.unwrap(),
                     }
                 }
+            }
+
+            Self::KlineStream { market, csv } => {
+                let queries = KlineQuery::from_csv(csv).unwrap();
+
+                market.watch(&queries, connection);
             }
         }
     }
