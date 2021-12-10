@@ -64,7 +64,8 @@ impl MarketEndpoint {
             }
         };
         for summary in summaries {
-            Kline::new(query.symbol.to_owned(), *self, summary).upsert(connection)?;
+            Kline::from_kline_summary(query.symbol.to_owned(), *self, summary)
+                .upsert(connection)?;
         }
         Ok(())
     }
@@ -101,7 +102,7 @@ pub struct Kline {
 }
 
 impl Kline {
-    pub fn new(symbol: String, source: MarketEndpoint, kline: KlineSummary) -> Self {
+    pub fn from_kline_summary(symbol: String, source: MarketEndpoint, kline: KlineSummary) -> Self {
         Self {
             source: source,
             symbol: symbol,
@@ -185,7 +186,7 @@ mod tests {
         };
 
         assert_eq!(
-            Kline::new("symbol".into(), MarketEndpoint::Spot, summary),
+            Kline::from_kline_summary("symbol".into(), MarketEndpoint::Spot, summary),
             raw_kline
         )
     }
