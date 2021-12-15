@@ -80,10 +80,18 @@ impl MarketEndpoint {
         Ok(())
     }
 
-    pub fn watch(&self, queries: &[KlineQuery], connection: &PgConnection) {
+    pub fn watch(
+        &self,
+        queries: &[KlineQuery],
+        interval: Option<String>,
+        connection: &PgConnection,
+    ) {
         let topics: Vec<String> = queries
             .into_iter()
-            .map(|query| format!("{}@kline_{}", query.symbol.to_lowercase(), query.interval))
+            .map(|query| {
+                let interval = interval.as_ref().unwrap_or(&query.interval);
+                format!("{}@kline_{}", query.symbol.to_lowercase(), interval)
+            })
             .collect();
         info!("Listen on topics: {:?}", topics);
         let keep_running = AtomicBool::new(true);

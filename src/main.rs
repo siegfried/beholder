@@ -130,6 +130,10 @@ enum BinanceCommands {
         /// The CSV file containing tasks of sync
         #[clap(short, long)]
         csv: String,
+
+        /// Use the interval instead of interval in CSV
+        #[clap(short, long)]
+        interval: Option<String>,
     },
 
     /// Fetch open interest summaries
@@ -179,10 +183,14 @@ impl BinanceCommands {
                 }
             }
 
-            Self::KlineStream { market, csv } => {
+            Self::KlineStream {
+                market,
+                csv,
+                interval,
+            } => {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
-                market.watch(&queries, connection);
+                market.watch(&queries, interval, connection);
             }
 
             Self::OpenInterestSummary {
