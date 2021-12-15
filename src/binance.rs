@@ -252,6 +252,39 @@ impl OpenInterestSummary {
             timestamp: hist.timestamp.try_into()?,
         })
     }
+
+    fn upsert(&self, connection: &PgConnection) -> QueryResult<usize> {
+        diesel::insert_into(binance_open_interest_summaries::table)
+            .values(self)
+            .on_conflict(on_constraint("binance_klines_pkey"))
+            .do_update()
+            .set(self)
+            .execute(connection)
+    }
+
+    fn fetch(
+        &self,
+        queries: &[KlineQuery],
+        limit: Option<u16>,
+        connection: &PgConnection,
+    ) -> Result {
+        let market: FutureEndpoint = Binance::new(None, None);
+        for query in queries {
+            let hists: Vec<OpenInterestHist> = market.open_interest_statistics(
+                query.symbol.to_owned(),
+                query.interval.to_owned(),
+                limit,
+                None,
+                None,
+            )?;
+
+            for hist in hists {
+                Self::from_open_interest_hist(query.interval.to_owned(), hist)?
+                    .upsert(connection)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
