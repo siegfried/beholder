@@ -20,3 +20,23 @@ table! {
         updated_at -> Timestamp,
     }
 }
+
+table! {
+    use diesel::sql_types::*;
+    use crate::binance::Market;
+
+    binance_open_interest_summaries (symbol, period, timestamp) {
+        symbol -> Varchar,
+        period -> Varchar,
+        timestamp -> Int8,
+        sum_open_interest -> Text,
+        sum_open_interest_value -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(
+    binance_klines,
+    binance_open_interest_summaries,
+);

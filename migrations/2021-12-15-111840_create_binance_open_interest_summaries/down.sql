@@ -1,0 +1,1 @@
+DROP TABLE binance_open_interest_summaries;

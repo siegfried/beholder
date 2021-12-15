@@ -1,5 +1,5 @@
 use crate::result::{Error, Result};
-use crate::schema::binance_klines;
+use crate::schema::{binance_klines, binance_open_interest_summaries};
 use binance_client::{
     api::Binance,
     futures::{
@@ -232,24 +232,25 @@ impl KlineQuery {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Insertable, AsChangeset)]
+#[table_name = "binance_open_interest_summaries"]
 struct OpenInterestSummary {
     symbol: String,
     period: String,
     sum_open_interest: String,
     sum_open_interest_value: String,
-    timestamp: u64,
+    timestamp: i64,
 }
 
 impl OpenInterestSummary {
-    fn from_open_interest_hist(period: String, hist: OpenInterestHist) -> Self {
-        Self {
+    fn from_open_interest_hist(period: String, hist: OpenInterestHist) -> Result<Self> {
+        Ok(Self {
             symbol: hist.symbol,
             period,
             sum_open_interest: hist.sum_open_interest,
             sum_open_interest_value: hist.sum_open_interest_value,
-            timestamp: hist.timestamp,
-        }
+            timestamp: hist.timestamp.try_into()?,
+        })
     }
 }
 
@@ -385,7 +386,7 @@ mod tests {
 
         assert_eq!(
             summary,
-            OpenInterestSummary::from_open_interest_hist("1d".into(), hist)
+            OpenInterestSummary::from_open_interest_hist("1d".into(), hist).unwrap()
         );
     }
 }
