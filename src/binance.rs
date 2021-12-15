@@ -56,7 +56,7 @@ impl MarketEndpoint {
         query: &KlineQuery,
         limit: Option<u16>,
         connection: &PgConnection,
-    ) -> Result<()> {
+    ) -> Result {
         let limit = limit.unwrap_or(query.limit);
         let symbol = query.symbol.to_owned();
         let interval = query.interval.to_owned();

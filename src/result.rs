@@ -17,8 +17,8 @@ impl fmt::Display for Error {
             Self::CSV(error) => fmt::Display::fmt(error, f),
             Self::BinanceClient(error) => fmt::Display::fmt(error, f),
             Self::Diesel(error) => fmt::Display::fmt(error, f),
-            Self::ParseStr(source) => fmt::Display::fmt(source, f),
             Self::TryFromNumber(error) => fmt::Display::fmt(error, f),
+            error => fmt::Display::fmt(error, f),
         }
     }
 }
