@@ -264,17 +264,24 @@ impl OpenInterestSummary {
 
     pub fn fetch(query: &KlineQuery, limit: Option<u16>, connection: &PgConnection) -> Result {
         let market: FutureEndpoint = Binance::new(None, None);
+        let symbol = &query.symbol;
+        let interval = &query.interval;
+
+        info!(
+            "Downloading open interest summary of {}@{} ...",
+            symbol, interval
+        );
 
         let hists: Vec<OpenInterestHist> = market.open_interest_statistics(
-            query.symbol.to_owned(),
-            query.interval.to_owned(),
+            symbol.to_owned(),
+            interval.to_owned(),
             limit,
             None,
             None,
         )?;
 
         for hist in hists {
-            Self::from_open_interest_hist(query.interval.to_owned(), hist)?.upsert(connection)?;
+            Self::from_open_interest_hist(interval.to_owned(), hist)?.upsert(connection)?;
         }
 
         Ok(())
