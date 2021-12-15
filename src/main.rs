@@ -126,6 +126,17 @@ enum BinanceCommands {
         #[clap(short, long)]
         csv: String,
     },
+
+    /// Fetch open interest summaries
+    OpenInterestSummary {
+        /// The CSV file containing tasks of sync
+        #[clap(short, long)]
+        csv: String,
+
+        /// Use the limit instead of limits in CSV
+        #[clap(short, long)]
+        limit: Option<u16>,
+    },
 }
 
 impl BinanceCommands {
@@ -150,6 +161,21 @@ impl BinanceCommands {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
                 market.watch(&queries, connection);
+            }
+
+            Self::OpenInterestSummary { csv, limit } => {
+                let queries = KlineQuery::from_csv(csv).unwrap();
+
+                for query in queries {
+                    match binance::OpenInterestSummary::fetch(&query, limit, connection) {
+                        Ok(()) => (),
+                        Err(Error::BinanceClient(error)) => {
+                            warn!("Binance client failed: {}", error);
+                            continue;
+                        }
+                        error => error.unwrap(),
+                    }
+                }
             }
         }
     }
