@@ -119,6 +119,14 @@ enum BinanceCommands {
         /// Use the limit instead of limits in CSV
         #[clap(short, long)]
         limit: Option<u16>,
+
+        /// Start time
+        #[clap(long = "from")]
+        start_time: Option<DateTime<Utc>>,
+
+        /// End time
+        #[clap(long = "to")]
+        end_time: Option<DateTime<Utc>>,
     },
 
     /// Watch Klines in real time
@@ -130,6 +138,10 @@ enum BinanceCommands {
         /// The CSV file containing tasks of sync
         #[clap(short, long)]
         csv: String,
+
+        /// Use the interval instead of interval in CSV
+        #[clap(short, long)]
+        interval: Option<String>,
     },
 
     /// Fetch open interest summaries
@@ -164,11 +176,20 @@ impl BinanceCommands {
                 csv,
                 interval,
                 limit,
+                start_time,
+                end_time,
             } => {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
                 for query in queries {
-                    match market.fetch(&query, interval.to_owned(), limit, connection) {
+                    match market.fetch(
+                        &query,
+                        interval.to_owned(),
+                        limit,
+                        start_time.map(|t| t.timestamp_millis() as u64),
+                        end_time.map(|t| t.timestamp_millis() as u64),
+                        connection,
+                    ) {
                         Ok(()) => (),
                         Err(Error::BinanceClient(error)) => {
                             warn!("Binance client failed: {}", error);
@@ -179,10 +200,14 @@ impl BinanceCommands {
                 }
             }
 
-            Self::KlineStream { market, csv } => {
+            Self::KlineStream {
+                market,
+                csv,
+                interval,
+            } => {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
-                market.watch(&queries, connection);
+                market.watch(&queries, interval, connection);
             }
 
             Self::OpenInterestSummary {

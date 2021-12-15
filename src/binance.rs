@@ -56,6 +56,8 @@ impl MarketEndpoint {
         query: &KlineQuery,
         interval: Option<String>,
         limit: Option<u16>,
+        start_time: Option<u64>,
+        end_time: Option<u64>,
         connection: &PgConnection,
     ) -> Result {
         let symbol = query.symbol.to_owned();
@@ -65,12 +67,12 @@ impl MarketEndpoint {
             MarketEndpoint::Spot => {
                 info!("Downloading {}@{} from Binance Spot...", symbol, interval);
                 let market: SpotEndpoint = Binance::new(None, None);
-                market.get_klines(symbol, interval, limit, None, None)?
+                market.get_klines(symbol, interval, limit, start_time, end_time)?
             }
             MarketEndpoint::USDM => {
                 info!("Downloading {}@{} from Binance USDM...", symbol, interval);
                 let market: FutureEndpoint = Binance::new(None, None);
-                market.get_klines(symbol, interval, limit, None, None)?
+                market.get_klines(symbol, interval, limit, start_time, end_time)?
             }
         };
         for summary in summaries {
@@ -80,10 +82,18 @@ impl MarketEndpoint {
         Ok(())
     }
 
-    pub fn watch(&self, queries: &[KlineQuery], connection: &PgConnection) {
+    pub fn watch(
+        &self,
+        queries: &[KlineQuery],
+        interval: Option<String>,
+        connection: &PgConnection,
+    ) {
         let topics: Vec<String> = queries
             .into_iter()
-            .map(|query| format!("{}@kline_{}", query.symbol.to_lowercase(), query.interval))
+            .map(|query| {
+                let interval = interval.as_ref().unwrap_or(&query.interval);
+                format!("{}@kline_{}", query.symbol.to_lowercase(), interval)
+            })
             .collect();
         info!("Listen on topics: {:?}", topics);
         let keep_running = AtomicBool::new(true);
