@@ -7,6 +7,7 @@ mod result;
 mod schema;
 
 use crate::binance::{KlineQuery, MarketEndpoint};
+use chrono::{DateTime, Utc};
 use clap::{AppSettings, Parser, Subcommand};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -111,6 +112,10 @@ enum BinanceCommands {
         #[clap(short, long)]
         csv: String,
 
+        /// Use the interval instead of interval in CSV
+        #[clap(short, long)]
+        interval: Option<String>,
+
         /// Use the limit instead of limits in CSV
         #[clap(short, long)]
         limit: Option<u16>,
@@ -126,16 +131,44 @@ enum BinanceCommands {
         #[clap(short, long)]
         csv: String,
     },
+
+    /// Fetch open interest summaries
+    OpenInterestSummary {
+        /// The CSV file containing tasks of sync
+        #[clap(short, long)]
+        csv: String,
+
+        /// Use the interval instead of interval in CSV
+        #[clap(short, long)]
+        interval: Option<String>,
+
+        /// Use the limit instead of limits in CSV
+        #[clap(short, long)]
+        limit: Option<u16>,
+
+        /// Start time
+        #[clap(long = "from")]
+        start_time: Option<DateTime<Utc>>,
+
+        /// End time
+        #[clap(long = "to")]
+        end_time: Option<DateTime<Utc>>,
+    },
 }
 
 impl BinanceCommands {
     fn run(self, connection: &PgConnection) {
         match self {
-            Self::Kline { market, csv, limit } => {
+            Self::Kline {
+                market,
+                csv,
+                interval,
+                limit,
+            } => {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
                 for query in queries {
-                    match market.fetch(&query, limit, connection) {
+                    match market.fetch(&query, interval.to_owned(), limit, connection) {
                         Ok(()) => (),
                         Err(Error::BinanceClient(error)) => {
                             warn!("Binance client failed: {}", error);
@@ -150,6 +183,34 @@ impl BinanceCommands {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
                 market.watch(&queries, connection);
+            }
+
+            Self::OpenInterestSummary {
+                csv,
+                interval,
+                start_time,
+                end_time,
+                limit,
+            } => {
+                let queries = KlineQuery::from_csv(csv).unwrap();
+
+                for query in queries {
+                    match binance::OpenInterestSummary::fetch(
+                        &query,
+                        interval.to_owned(),
+                        limit,
+                        start_time.map(|t| t.timestamp_millis() as u64),
+                        end_time.map(|t| t.timestamp_millis() as u64),
+                        connection,
+                    ) {
+                        Ok(()) => (),
+                        Err(Error::BinanceClient(error)) => {
+                            warn!("Binance client failed: {}", error);
+                            continue;
+                        }
+                        error => error.unwrap(),
+                    }
+                }
             }
         }
     }

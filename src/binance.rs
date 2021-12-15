@@ -1,9 +1,10 @@
 use crate::result::{Error, Result};
-use crate::schema::binance_klines;
+use crate::schema::{binance_klines, binance_open_interest_summaries};
 use binance_client::{
     api::Binance,
     futures::{
         market::FuturesMarket as FutureEndpoint,
+        model::OpenInterestHist,
         websockets::{
             FuturesMarket, FuturesWebSockets as FutureWebSocket,
             FuturesWebsocketEvent as FutureWebSocketEvent,
@@ -53,12 +54,13 @@ impl MarketEndpoint {
     pub fn fetch(
         &self,
         query: &KlineQuery,
+        interval: Option<String>,
         limit: Option<u16>,
         connection: &PgConnection,
-    ) -> Result<()> {
-        let limit = limit.unwrap_or(query.limit);
+    ) -> Result {
         let symbol = query.symbol.to_owned();
-        let interval = query.interval.to_owned();
+        let interval = interval.unwrap_or(query.interval.to_owned());
+        let limit = limit.unwrap_or(query.limit);
         let KlineSummaries::AllKlineSummaries(summaries) = match self {
             MarketEndpoint::Spot => {
                 info!("Downloading {}@{} from Binance Spot...", symbol, interval);
@@ -231,9 +233,73 @@ impl KlineQuery {
     }
 }
 
+#[derive(Debug, PartialEq, Insertable, AsChangeset)]
+#[table_name = "binance_open_interest_summaries"]
+pub struct OpenInterestSummary {
+    symbol: String,
+    interval: String,
+    sum_open_interest: String,
+    sum_open_interest_value: String,
+    timestamp: i64,
+}
+
+impl OpenInterestSummary {
+    fn from_open_interest_hist(interval: String, hist: OpenInterestHist) -> Result<Self> {
+        Ok(Self {
+            symbol: hist.symbol,
+            interval,
+            sum_open_interest: hist.sum_open_interest,
+            sum_open_interest_value: hist.sum_open_interest_value,
+            timestamp: hist.timestamp.try_into()?,
+        })
+    }
+
+    fn upsert(&self, connection: &PgConnection) -> QueryResult<usize> {
+        diesel::insert_into(binance_open_interest_summaries::table)
+            .values(self)
+            .on_conflict(on_constraint("binance_open_interest_summaries_pkey"))
+            .do_update()
+            .set(self)
+            .execute(connection)
+    }
+
+    pub fn fetch(
+        query: &KlineQuery,
+        interval: Option<String>,
+        limit: Option<u16>,
+        start_time: Option<u64>,
+        end_time: Option<u64>,
+        connection: &PgConnection,
+    ) -> Result {
+        let market: FutureEndpoint = Binance::new(None, None);
+        let symbol = &query.symbol;
+        let interval = interval.unwrap_or(query.interval.to_owned());
+
+        info!(
+            "Downloading open interest summary of {}@{} ...",
+            symbol, interval
+        );
+
+        let hists: Vec<OpenInterestHist> = market.open_interest_statistics(
+            symbol.to_owned(),
+            interval.to_owned(),
+            limit,
+            start_time,
+            end_time,
+        )?;
+
+        for hist in hists {
+            Self::from_open_interest_hist(interval.to_owned(), hist)?.upsert(connection)?;
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Kline, KlineQuery, MarketEndpoint};
+    use super::{Kline, KlineQuery, MarketEndpoint, OpenInterestSummary};
+    use binance_client::futures::model::OpenInterestHist;
     use binance_client::model::{self, KlineEvent, KlineSummary};
 
     #[test]
@@ -341,5 +407,28 @@ mod tests {
         ];
 
         assert_eq!(arguments, results)
+    }
+
+    #[test]
+    fn create_open_interest_summary_from_hist() {
+        let hist = OpenInterestHist {
+            symbol: "BTCUSDT".into(),
+            sum_open_interest: "20403.63700000".into(),
+            sum_open_interest_value: "150570784.07809979".into(),
+            timestamp: 1583127900000,
+        };
+
+        let summary = OpenInterestSummary {
+            symbol: "BTCUSDT".into(),
+            interval: "1d".into(),
+            sum_open_interest: "20403.63700000".into(),
+            sum_open_interest_value: "150570784.07809979".into(),
+            timestamp: 1583127900000,
+        };
+
+        assert_eq!(
+            summary,
+            OpenInterestSummary::from_open_interest_hist("1d".into(), hist).unwrap()
+        );
     }
 }

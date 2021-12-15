@@ -1,4 +1,4 @@
-use std::{error, fmt, io, result};
+use std::{error, fmt, io, num, result};
 
 #[derive(Debug)]
 pub enum Error {
@@ -7,6 +7,7 @@ pub enum Error {
     BinanceClient(binance_client::errors::Error),
     Diesel(diesel::result::Error),
     ParseStr(String),
+    TryFromNumber(num::TryFromIntError),
 }
 
 impl fmt::Display for Error {
@@ -16,7 +17,8 @@ impl fmt::Display for Error {
             Self::CSV(error) => fmt::Display::fmt(error, f),
             Self::BinanceClient(error) => fmt::Display::fmt(error, f),
             Self::Diesel(error) => fmt::Display::fmt(error, f),
-            Self::ParseStr(source) => fmt::Display::fmt(source, f),
+            Self::TryFromNumber(error) => fmt::Display::fmt(error, f),
+            error => fmt::Display::fmt(error, f),
         }
     }
 }
@@ -29,6 +31,7 @@ impl error::Error for Error {
             Self::BinanceClient(error) => Some(error),
             Self::Diesel(error) => Some(error),
             Self::ParseStr(_) => None,
+            Self::TryFromNumber(error) => Some(error),
         }
     }
 }
@@ -57,4 +60,10 @@ impl From<diesel::result::Error> for Error {
     }
 }
 
-pub type Result<T> = result::Result<T, Error>;
+impl From<num::TryFromIntError> for Error {
+    fn from(error: num::TryFromIntError) -> Self {
+        Self::TryFromNumber(error)
+    }
+}
+
+pub type Result<T = ()> = result::Result<T, Error>;
