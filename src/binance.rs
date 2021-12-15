@@ -54,12 +54,13 @@ impl MarketEndpoint {
     pub fn fetch(
         &self,
         query: &KlineQuery,
+        interval: Option<String>,
         limit: Option<u16>,
         connection: &PgConnection,
     ) -> Result {
-        let limit = limit.unwrap_or(query.limit);
         let symbol = query.symbol.to_owned();
-        let interval = query.interval.to_owned();
+        let interval = interval.unwrap_or(query.interval.to_owned());
+        let limit = limit.unwrap_or(query.limit);
         let KlineSummaries::AllKlineSummaries(summaries) = match self {
             MarketEndpoint::Spot => {
                 info!("Downloading {}@{} from Binance Spot...", symbol, interval);

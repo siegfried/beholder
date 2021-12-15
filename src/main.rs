@@ -111,6 +111,10 @@ enum BinanceCommands {
         #[clap(short, long)]
         csv: String,
 
+        /// Use the interval instead of interval in CSV
+        #[clap(short, long)]
+        interval: Option<String>,
+
         /// Use the limit instead of limits in CSV
         #[clap(short, long)]
         limit: Option<u16>,
@@ -146,11 +150,16 @@ enum BinanceCommands {
 impl BinanceCommands {
     fn run(self, connection: &PgConnection) {
         match self {
-            Self::Kline { market, csv, limit } => {
+            Self::Kline {
+                market,
+                csv,
+                interval,
+                limit,
+            } => {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
                 for query in queries {
-                    match market.fetch(&query, limit, connection) {
+                    match market.fetch(&query, interval.to_owned(), limit, connection) {
                         Ok(()) => (),
                         Err(Error::BinanceClient(error)) => {
                             warn!("Binance client failed: {}", error);
