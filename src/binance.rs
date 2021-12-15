@@ -236,17 +236,17 @@ impl KlineQuery {
 #[table_name = "binance_open_interest_summaries"]
 pub struct OpenInterestSummary {
     symbol: String,
-    period: String,
+    interval: String,
     sum_open_interest: String,
     sum_open_interest_value: String,
     timestamp: i64,
 }
 
 impl OpenInterestSummary {
-    fn from_open_interest_hist(period: String, hist: OpenInterestHist) -> Result<Self> {
+    fn from_open_interest_hist(interval: String, hist: OpenInterestHist) -> Result<Self> {
         Ok(Self {
             symbol: hist.symbol,
-            period,
+            interval,
             sum_open_interest: hist.sum_open_interest,
             sum_open_interest_value: hist.sum_open_interest_value,
             timestamp: hist.timestamp.try_into()?,
@@ -405,7 +405,7 @@ mod tests {
 
         let summary = OpenInterestSummary {
             symbol: "BTCUSDT".into(),
-            period: "1d".into(),
+            interval: "1d".into(),
             sum_open_interest: "20403.63700000".into(),
             sum_open_interest_value: "150570784.07809979".into(),
             timestamp: 1583127900000,

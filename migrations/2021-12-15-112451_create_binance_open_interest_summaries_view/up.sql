@@ -1,6 +1,6 @@
 CREATE VIEW binance_open_interest_summaries_view AS
   SELECT symbol,
-         period,
+         interval,
          TO_TIMESTAMP(timestamp / 1000)::TIMESTAMP AS timestamp,
          sum_open_interest::NUMERIC,
          sum_open_interest_value::NUMERIC,
