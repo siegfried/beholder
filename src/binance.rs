@@ -267,6 +267,8 @@ impl OpenInterestSummary {
         query: &KlineQuery,
         interval: Option<String>,
         limit: Option<u16>,
+        start_time: Option<u64>,
+        end_time: Option<u64>,
         connection: &PgConnection,
     ) -> Result {
         let market: FutureEndpoint = Binance::new(None, None);
@@ -282,8 +284,8 @@ impl OpenInterestSummary {
             symbol.to_owned(),
             interval.to_owned(),
             limit,
-            None,
-            None,
+            start_time,
+            end_time,
         )?;
 
         for hist in hists {

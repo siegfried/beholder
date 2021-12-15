@@ -7,6 +7,7 @@ mod result;
 mod schema;
 
 use crate::binance::{KlineQuery, MarketEndpoint};
+use chrono::{DateTime, Utc};
 use clap::{AppSettings, Parser, Subcommand};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -144,6 +145,14 @@ enum BinanceCommands {
         /// Use the limit instead of limits in CSV
         #[clap(short, long)]
         limit: Option<u16>,
+
+        /// Start time
+        #[clap(long = "from")]
+        start_time: Option<DateTime<Utc>>,
+
+        /// End time
+        #[clap(long = "to")]
+        end_time: Option<DateTime<Utc>>,
     },
 }
 
@@ -179,6 +188,8 @@ impl BinanceCommands {
             Self::OpenInterestSummary {
                 csv,
                 interval,
+                start_time,
+                end_time,
                 limit,
             } => {
                 let queries = KlineQuery::from_csv(csv).unwrap();
@@ -188,6 +199,8 @@ impl BinanceCommands {
                         &query,
                         interval.to_owned(),
                         limit,
+                        start_time.map(|t| t.timestamp_millis() as u64),
+                        end_time.map(|t| t.timestamp_millis() as u64),
                         connection,
                     ) {
                         Ok(()) => (),
