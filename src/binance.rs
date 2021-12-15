@@ -56,6 +56,8 @@ impl MarketEndpoint {
         query: &KlineQuery,
         interval: Option<String>,
         limit: Option<u16>,
+        start_time: Option<u64>,
+        end_time: Option<u64>,
         connection: &PgConnection,
     ) -> Result {
         let symbol = query.symbol.to_owned();
@@ -65,12 +67,12 @@ impl MarketEndpoint {
             MarketEndpoint::Spot => {
                 info!("Downloading {}@{} from Binance Spot...", symbol, interval);
                 let market: SpotEndpoint = Binance::new(None, None);
-                market.get_klines(symbol, interval, limit, None, None)?
+                market.get_klines(symbol, interval, limit, start_time, end_time)?
             }
             MarketEndpoint::USDM => {
                 info!("Downloading {}@{} from Binance USDM...", symbol, interval);
                 let market: FutureEndpoint = Binance::new(None, None);
-                market.get_klines(symbol, interval, limit, None, None)?
+                market.get_klines(symbol, interval, limit, start_time, end_time)?
             }
         };
         for summary in summaries {
