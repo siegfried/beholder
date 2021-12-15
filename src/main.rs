@@ -133,6 +133,10 @@ enum BinanceCommands {
         #[clap(short, long)]
         csv: String,
 
+        /// Use the interval instead of interval in CSV
+        #[clap(short, long)]
+        interval: Option<String>,
+
         /// Use the limit instead of limits in CSV
         #[clap(short, long)]
         limit: Option<u16>,
@@ -163,11 +167,20 @@ impl BinanceCommands {
                 market.watch(&queries, connection);
             }
 
-            Self::OpenInterestSummary { csv, limit } => {
+            Self::OpenInterestSummary {
+                csv,
+                interval,
+                limit,
+            } => {
                 let queries = KlineQuery::from_csv(csv).unwrap();
 
                 for query in queries {
-                    match binance::OpenInterestSummary::fetch(&query, limit, connection) {
+                    match binance::OpenInterestSummary::fetch(
+                        &query,
+                        interval.to_owned(),
+                        limit,
+                        connection,
+                    ) {
                         Ok(()) => (),
                         Err(Error::BinanceClient(error)) => {
                             warn!("Binance client failed: {}", error);

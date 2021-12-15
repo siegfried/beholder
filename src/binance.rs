@@ -262,10 +262,15 @@ impl OpenInterestSummary {
             .execute(connection)
     }
 
-    pub fn fetch(query: &KlineQuery, limit: Option<u16>, connection: &PgConnection) -> Result {
+    pub fn fetch(
+        query: &KlineQuery,
+        interval: Option<String>,
+        limit: Option<u16>,
+        connection: &PgConnection,
+    ) -> Result {
         let market: FutureEndpoint = Binance::new(None, None);
         let symbol = &query.symbol;
-        let interval = &query.interval;
+        let interval = interval.unwrap_or(query.interval.to_owned());
 
         info!(
             "Downloading open interest summary of {}@{} ...",
