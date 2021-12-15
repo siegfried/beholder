@@ -4,6 +4,7 @@ use binance_client::{
     api::Binance,
     futures::{
         market::FuturesMarket as FutureEndpoint,
+        model::OpenInterestHist,
         websockets::{
             FuturesMarket, FuturesWebSockets as FutureWebSocket,
             FuturesWebsocketEvent as FutureWebSocketEvent,
@@ -231,9 +232,31 @@ impl KlineQuery {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct OpenInterestSummary {
+    symbol: String,
+    period: String,
+    sum_open_interest: String,
+    sum_open_interest_value: String,
+    timestamp: u64,
+}
+
+impl OpenInterestSummary {
+    fn from_open_interest_hist(period: String, hist: OpenInterestHist) -> Self {
+        Self {
+            symbol: hist.symbol,
+            period,
+            sum_open_interest: hist.sum_open_interest,
+            sum_open_interest_value: hist.sum_open_interest_value,
+            timestamp: hist.timestamp,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Kline, KlineQuery, MarketEndpoint};
+    use super::{Kline, KlineQuery, MarketEndpoint, OpenInterestSummary};
+    use binance_client::futures::model::OpenInterestHist;
     use binance_client::model::{self, KlineEvent, KlineSummary};
 
     #[test]
@@ -341,5 +364,28 @@ mod tests {
         ];
 
         assert_eq!(arguments, results)
+    }
+
+    #[test]
+    fn create_open_interest_summary_from_hist() {
+        let hist = OpenInterestHist {
+            symbol: "BTCUSDT".into(),
+            sum_open_interest: "20403.63700000".into(),
+            sum_open_interest_value: "150570784.07809979".into(),
+            timestamp: 1583127900000,
+        };
+
+        let summary = OpenInterestSummary {
+            symbol: "BTCUSDT".into(),
+            period: "1d".into(),
+            sum_open_interest: "20403.63700000".into(),
+            sum_open_interest_value: "150570784.07809979".into(),
+            timestamp: 1583127900000,
+        };
+
+        assert_eq!(
+            summary,
+            OpenInterestSummary::from_open_interest_hist("1d".into(), hist)
+        );
     }
 }
