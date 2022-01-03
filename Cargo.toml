@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 binance = "~0.18.1"
 diesel = { version = "~1.4.4", features = ["postgres"] }
-clap = { version = "~3.0.0-rc.4", features = ["derive"] }
+clap = { version = "~3.0.0", features = ["derive"] }
 csv = "~1.1"
 serde = { version = "~1.0.130", features = ["derive"] }
 log = "~0.4"
