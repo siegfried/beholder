@@ -137,7 +137,7 @@ impl MarketEndpoint {
                         Ok(())
                     });
                 web_socket
-                    .connect_multiple_streams(FuturesMarket::USDM, &topics)
+                    .connect_multiple_streams(&FuturesMarket::USDM, &topics)
                     .unwrap();
                 web_socket.event_loop(&keep_running).unwrap();
                 web_socket.disconnect().unwrap();
