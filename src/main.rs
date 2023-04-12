@@ -74,8 +74,8 @@ impl Commands {
                 database_url,
                 command,
             } => {
-                let connection = PgConnection::establish(&database_url).unwrap();
-                command.run(&connection);
+                let mut connection = PgConnection::establish(&database_url).unwrap();
+                command.run(&mut connection);
             }
         }
     }
@@ -91,7 +91,7 @@ enum SnapshotCommands {
 }
 
 impl SnapshotCommands {
-    fn run(self, connection: &PgConnection) {
+    fn run(self, connection: &mut PgConnection) {
         match self {
             Self::Binance { command } => command.run(connection),
         }
@@ -167,7 +167,7 @@ enum BinanceCommands {
 }
 
 impl BinanceCommands {
-    fn run(self, connection: &PgConnection) {
+    fn run(self, connection: &mut PgConnection) {
         match self {
             Self::Kline {
                 market,

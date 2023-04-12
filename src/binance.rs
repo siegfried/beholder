@@ -58,7 +58,7 @@ impl MarketEndpoint {
         limit: Option<u16>,
         start_time: Option<u64>,
         end_time: Option<u64>,
-        connection: &PgConnection,
+        connection: &mut PgConnection,
     ) -> Result {
         let symbol = query.symbol.to_owned();
         let interval = interval.unwrap_or(query.interval.to_owned());
@@ -86,7 +86,7 @@ impl MarketEndpoint {
         &self,
         queries: &[KlineQuery],
         interval: Option<String>,
-        connection: &PgConnection,
+        connection: &mut PgConnection,
     ) {
         let topics: Vec<String> = queries
             .into_iter()
@@ -215,7 +215,7 @@ impl Kline {
         }
     }
 
-    pub fn upsert(&self, connection: &PgConnection) -> QueryResult<usize> {
+    pub fn upsert(&self, connection: &mut PgConnection) -> QueryResult<usize> {
         diesel::insert_into(binance_klines::table)
             .values(self)
             .on_conflict(on_constraint("binance_klines_pkey"))
@@ -264,7 +264,7 @@ impl OpenInterestSummary {
         })
     }
 
-    fn upsert(&self, connection: &PgConnection) -> QueryResult<usize> {
+    fn upsert(&self, connection: &mut PgConnection) -> QueryResult<usize> {
         diesel::insert_into(binance_open_interest_summaries::table)
             .values(self)
             .on_conflict(on_constraint("binance_open_interest_summaries_pkey"))
@@ -279,7 +279,7 @@ impl OpenInterestSummary {
         limit: Option<u16>,
         start_time: Option<u64>,
         end_time: Option<u64>,
-        connection: &PgConnection,
+        connection: &mut PgConnection,
     ) -> Result {
         let market: FutureEndpoint = Binance::new(None, None);
         let symbol = &query.symbol;
