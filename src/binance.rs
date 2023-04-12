@@ -41,7 +41,7 @@ pub enum MarketEndpoint {
 }
 
 impl ToSql<Market, Pg> for MarketEndpoint {
-    fn to_sql<W: Write>(&self, out: &mut Output<W, Pg>) -> serialize::Result {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> serialize::Result {
         match *self {
             MarketEndpoint::Spot => out.write_all(b"SPOT")?,
             MarketEndpoint::USDM => out.write_all(b"USDM")?,
