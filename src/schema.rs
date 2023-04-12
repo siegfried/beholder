@@ -23,7 +23,6 @@ table! {
 
 table! {
     use diesel::sql_types::*;
-    use crate::binance::Market;
 
     binance_open_interest_summaries (symbol, interval, timestamp) {
         symbol -> Varchar,
