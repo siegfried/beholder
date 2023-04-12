@@ -10,7 +10,7 @@ binance = "~0.20.2"
 diesel = { version = "~2.0.3", features = ["postgres"] }
 clap = { version = "~3.2.1", features = ["derive"] }
 csv = "~1.1"
-serde = { version = "~1.0.130", features = ["derive"] }
+serde = { version = "~1.0.160", features = ["derive"] }
 log = "~0.4"
 stderrlog = "~0.5"
 chrono = { version = "~0.4", features = ["unstable-locales"] }
