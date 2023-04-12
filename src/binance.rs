@@ -30,11 +30,11 @@ use std::{
 };
 
 #[derive(SqlType)]
-#[postgres(type_name = "market")]
+#[diesel(postgres_type(name = "market"))]
 pub struct Market;
 
 #[derive(Debug, PartialEq, AsExpression, Clone, Copy, clap::ArgEnum)]
-#[sql_type = "Market"]
+#[diesel(sql_type = Market)]
 pub enum MarketEndpoint {
     Spot,
     USDM,
@@ -159,7 +159,7 @@ impl FromStr for MarketEndpoint {
 }
 
 #[derive(Debug, PartialEq, Insertable, AsChangeset)]
-#[table_name = "binance_klines"]
+#[diesel(table_name = binance_klines)]
 pub struct Kline {
     source: MarketEndpoint,
     symbol: String,
@@ -244,7 +244,7 @@ impl KlineQuery {
 }
 
 #[derive(Debug, PartialEq, Insertable, AsChangeset)]
-#[table_name = "binance_open_interest_summaries"]
+#[diesel(table_name = binance_open_interest_summaries)]
 pub struct OpenInterestSummary {
     symbol: String,
     interval: String,
