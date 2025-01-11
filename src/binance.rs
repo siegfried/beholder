@@ -30,18 +30,18 @@ use std::{
 };
 
 #[derive(SqlType)]
-#[postgres(type_name = "market")]
+#[diesel(postgres_type(name = "market"))]
 pub struct Market;
 
 #[derive(Debug, PartialEq, AsExpression, Clone, Copy, clap::ArgEnum)]
-#[sql_type = "Market"]
+#[diesel(sql_type = Market)]
 pub enum MarketEndpoint {
     Spot,
     USDM,
 }
 
 impl ToSql<Market, Pg> for MarketEndpoint {
-    fn to_sql<W: Write>(&self, out: &mut Output<W, Pg>) -> serialize::Result {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> serialize::Result {
         match *self {
             MarketEndpoint::Spot => out.write_all(b"SPOT")?,
             MarketEndpoint::USDM => out.write_all(b"USDM")?,
@@ -58,7 +58,7 @@ impl MarketEndpoint {
         limit: Option<u16>,
         start_time: Option<u64>,
         end_time: Option<u64>,
-        connection: &PgConnection,
+        connection: &mut PgConnection,
     ) -> Result {
         let symbol = query.symbol.to_owned();
         let interval = interval.unwrap_or(query.interval.to_owned());
@@ -86,7 +86,7 @@ impl MarketEndpoint {
         &self,
         queries: &[KlineQuery],
         interval: Option<String>,
-        connection: &PgConnection,
+        connection: &mut PgConnection,
     ) {
         let topics: Vec<String> = queries
             .into_iter()
@@ -137,7 +137,7 @@ impl MarketEndpoint {
                         Ok(())
                     });
                 web_socket
-                    .connect_multiple_streams(FuturesMarket::USDM, &topics)
+                    .connect_multiple_streams(&FuturesMarket::USDM, &topics)
                     .unwrap();
                 web_socket.event_loop(&keep_running).unwrap();
                 web_socket.disconnect().unwrap();
@@ -159,7 +159,7 @@ impl FromStr for MarketEndpoint {
 }
 
 #[derive(Debug, PartialEq, Insertable, AsChangeset)]
-#[table_name = "binance_klines"]
+#[diesel(table_name = binance_klines)]
 pub struct Kline {
     source: MarketEndpoint,
     symbol: String,
@@ -215,7 +215,7 @@ impl Kline {
         }
     }
 
-    pub fn upsert(&self, connection: &PgConnection) -> QueryResult<usize> {
+    pub fn upsert(&self, connection: &mut PgConnection) -> QueryResult<usize> {
         diesel::insert_into(binance_klines::table)
             .values(self)
             .on_conflict(on_constraint("binance_klines_pkey"))
@@ -244,7 +244,7 @@ impl KlineQuery {
 }
 
 #[derive(Debug, PartialEq, Insertable, AsChangeset)]
-#[table_name = "binance_open_interest_summaries"]
+#[diesel(table_name = binance_open_interest_summaries)]
 pub struct OpenInterestSummary {
     symbol: String,
     interval: String,
@@ -264,7 +264,7 @@ impl OpenInterestSummary {
         })
     }
 
-    fn upsert(&self, connection: &PgConnection) -> QueryResult<usize> {
+    fn upsert(&self, connection: &mut PgConnection) -> QueryResult<usize> {
         diesel::insert_into(binance_open_interest_summaries::table)
             .values(self)
             .on_conflict(on_constraint("binance_open_interest_summaries_pkey"))
@@ -279,7 +279,7 @@ impl OpenInterestSummary {
         limit: Option<u16>,
         start_time: Option<u64>,
         end_time: Option<u64>,
-        connection: &PgConnection,
+        connection: &mut PgConnection,
     ) -> Result {
         let market: FutureEndpoint = Binance::new(None, None);
         let symbol = &query.symbol;
