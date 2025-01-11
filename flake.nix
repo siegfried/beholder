@@ -2,6 +2,7 @@
   description = "A beholder for data";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
+    flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
   };
   outputs =
     { self, nixpkgs }:
