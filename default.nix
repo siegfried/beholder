@@ -9,5 +9,6 @@ pkgs.rustPlatform.buildRustPackage {
   buildInputs = [
     pkgs.postgresql_17
     pkgs.openssl
+    pkgs.pkg-config
   ];
 }
