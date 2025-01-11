@@ -1,12 +1,10 @@
-(import (
-  let
-    lock = builtins.fromJSON (builtins.readFile ./flake.lock);
-    nodeName = lock.nodes.root.inputs.flake-compat;
-  in
-  fetchTarball {
-    url =
-      lock.nodes.${nodeName}.locked.url
-        or "https://github.com/edolstra/flake-compat/archive/${lock.nodes.${nodeName}.locked.rev}.tar.gz";
-    sha256 = lock.nodes.${nodeName}.locked.narHash;
-  }
-) { src = ./.; }).defaultNix
+{
+  pkgs ? import <nixpkgs> { },
+}:
+pkgs.rustPlatform.buildRustPackage {
+  pname = "beholder";
+  version = "0.1.0";
+  cargoLock.lockFile = ./Cargo.lock;
+  src = pkgs.lib.cleanSource ./.;
+  buildInputs = [ pkgs.postgresql_17 ];
+}

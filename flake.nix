@@ -2,10 +2,9 @@
   description = "A beholder for data";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
-    flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
   };
   outputs =
-    { self, nixpkgs, ... }:
+    { nixpkgs, ... }:
     let
       supportedSystems = [
         "x86_64-darwin"
@@ -16,13 +15,7 @@
     in
     {
       packages = forAllSystems (system: {
-        default = pkgsFor.${system}.rustPlatform.buildRustPackage {
-          pname = "beholder";
-          version = "0.1.0";
-          cargoLock.lockFile = ./Cargo.lock;
-          src = nixpkgs.lib.cleanSource ./.;
-          buildInputs = [ pkgsFor.${system}.postgresql_17 ];
-        };
+        default = pkgsFor.${system}.callPackage ./. { };
       });
     };
 }
