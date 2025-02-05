@@ -11,11 +11,16 @@
         "x86_64-linux"
       ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      pkgsFor = nixpkgs.legacyPackages;
     in
     {
-      packages = forAllSystems (system: {
-        default = pkgsFor.${system}.callPackage ./. { };
-      });
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          default = pkgs.callPackage ./. { };
+        }
+      );
     };
 }

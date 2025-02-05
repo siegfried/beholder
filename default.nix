@@ -12,5 +12,6 @@ pkgs.rustPlatform.buildRustPackage {
   ];
   nativeBuildInputs = [
     pkgs.pkg-config
+    pkgs.openssl.dev
   ];
 }
